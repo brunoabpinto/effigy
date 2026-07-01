@@ -11,7 +11,7 @@ local BAK = "save.bak.lua"
 local VERSION = 1
 
 local function default()
-  return { version = VERSION, collection = {}, seen = {}, campaign = nil }
+  return { version = VERSION, collection = {}, seen = {}, decks = {}, campaign = nil }
 end
 
 save.data = default()
@@ -113,6 +113,19 @@ end
 
 function save.hasSeen(element, seed)
   return save.data.seen[key(element, seed)] == true
+end
+
+-- Decks --------------------------------------------------------------------
+
+-- Stored deck records for an element (see deck.roll), or nil if never built.
+function save.getDeck(element)
+  return save.data.decks[element]
+end
+
+-- Persist an element's deck records so the same deck reappears next session.
+function save.setDeck(element, records)
+  save.data.decks[element] = records
+  save.flush()
 end
 
 -- Campaign -----------------------------------------------------------------

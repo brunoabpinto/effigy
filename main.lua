@@ -8,6 +8,7 @@ local cardview = require("src.screens.cardview")
 local dex = require("src.screens.dex")
 local deckselect = require("src.screens.deckselect")
 local deck = require("src.core.deck")
+local save = require("src.core.save")
 local deckview = require("src.screens.deckview")
 local partsview = require("src.screens.partsview")
 local mode = "menu"
@@ -24,7 +25,14 @@ local function openDeckSelect()
   deckselect.load({
     choose = function(el)
       if not campaignDeck or campaignDeck.element ~= el then
-        campaignDeck = { element = el, entries = deck.build(el) }
+        -- Reuse the stored deck for this element; roll and persist a new one only
+        -- the first time it's opened, so the same cards reappear every session.
+        local records = save.getDeck(el)
+        if not records then
+          records = deck.roll(el)
+          save.setDeck(el, records)
+        end
+        campaignDeck = { element = el, entries = deck.hydrate(el, records) }
       end
       deckview.load(el, campaignDeck.entries)
       mode = "deckview"
@@ -44,6 +52,7 @@ local function toMenu()
 end
 
 function love.load(arg)
+  save.load()
   local a = arg[1]
   if a == "--dex" then
     openDex()
