@@ -2,14 +2,17 @@
 -- `love .`        -> main menu (game entry point)
 -- `love . <id>`   -> dev card preview (e.g. love . 001)
 -- `love . --dex`  -> dex: all creatures in a grid (click a card for its variants)
+-- `love . --match`-> hotseat match on the board screen (fire vs water)
 
 local menu = require("src.screens.menu")
 local cardview = require("src.screens.cardview")
 local dex = require("src.screens.dex")
 local deckselect = require("src.screens.deckselect")
 local deck = require("src.core.deck")
+local match = require("src.core.match")
 local save = require("src.core.save")
 local deckview = require("src.screens.deckview")
+local board = require("src.screens.board")
 local partsview = require("src.screens.partsview")
 local mode = "menu"
 local cameFromDex = false
@@ -51,11 +54,22 @@ local function toMenu()
   mode = "menu"
 end
 
+local function openMatch()
+  local decks = {
+    { element = "fire", records = deck.roll("fire") },
+    { element = "water", records = deck.roll("water") },
+  }
+  board.load(match.new(decks))
+  mode = "match"
+end
+
 function love.load(arg)
   save.load()
   local a = arg[1]
   if a == "--dex" then
     openDex()
+  elseif a == "--match" then
+    openMatch()
   elseif a == "--parts" then
     partsview.load()
     mode = "parts"
@@ -69,7 +83,8 @@ end
 
 function love.update(dt)
   if mode == "card" then cardview.update(dt)
-  elseif mode == "deckselect" then deckselect.update(dt) end
+  elseif mode == "deckselect" then deckselect.update(dt)
+  elseif mode == "match" then board.update(dt) end
 end
 
 function love.draw()
@@ -83,6 +98,8 @@ function love.draw()
     deckselect.draw()
   elseif mode == "deckview" then
     deckview.draw()
+  elseif mode == "match" then
+    board.draw()
   elseif mode == "parts" then
     partsview.draw()
   end
@@ -128,6 +145,8 @@ function love.mousepressed(x, y, button)
     end
   elseif mode == "deckselect" then
     deckselect.mousepressed(x, y, button)
+  elseif mode == "match" then
+    board.mousepressed(x, y, button)
   elseif mode == "card" then
     back()
   end
@@ -151,6 +170,12 @@ function love.keypressed(key)
     if key == "escape" then back() else deckselect.keypressed(key) end
   elseif mode == "deckview" then
     if key == "escape" then back() else deckview.keypressed(key) end
+  elseif mode == "match" then
+    if key == "escape" then
+      if not board.escape() then toMenu() end
+    else
+      board.keypressed(key)
+    end
   elseif mode == "parts" then
     if key == "escape" then love.event.quit() end
   elseif key == "escape" then
