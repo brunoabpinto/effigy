@@ -43,6 +43,19 @@ local function spriteFor(c)
   return s
 end
 
+-- false = cached miss (basic, or id with no art/hires/<id>.png) -> pixel fallback.
+local hiresCache = {}
+local function hiresFor(c)
+  if not c.id then return nil end
+  local v = hiresCache[c.id]
+  if v == nil then
+    local path = "art/hires/" .. c.id .. ".png"
+    v = love.filesystem.getInfo(path) and love.graphics.newImage(path) or false
+    hiresCache[c.id] = v
+  end
+  return v or nil
+end
+
 function board.load(matchState)
   state = matchState
   t = 0
@@ -68,7 +81,11 @@ local function drawCard(c, power, x, y, opts)
   opts.name, opts.power, opts.time = c.name, power, t
   opts.champion = c.kind == "champion"
   opts.holo, opts.corrupt = c.shiny, c.corrupted
-  card.draw(spriteFor(c), c.element, x, y, SCALE, opts)
+  if opts.onBoard then
+    card.drawStanding(spriteFor(c), hiresFor(c), c.element, x, y, SCALE, opts)
+  else
+    card.draw(spriteFor(c), c.element, x, y, SCALE, opts)
+  end
 end
 
 local function outline(x, y, color)
@@ -133,7 +150,7 @@ function board.draw()
   -- foe board (in block mode these are the defender's blocker choices)
   for i, c in ipairs(foe.board) do
     local r = rects.foeBoard[i]
-    drawCard(c.card, c.power, r.x, r.y)
+    drawCard(c.card, c.power, r.x, r.y, { onBoard = true })
     if mode == "block" and #foe.board > 0 then outline(r.x, r.y, BLOCKER) end
   end
 
@@ -149,7 +166,7 @@ function board.draw()
   local attackers = legalAttackerSet()
   for i, c in ipairs(me.board) do
     local r = rects.myBoard[i]
-    drawCard(c.card, c.power, r.x, r.y)
+    drawCard(c.card, c.power, r.x, r.y, { onBoard = true })
     if mode == "sacrifice" and c.kind == "basic" then
       if sacrifice[i] then outline(r.x, r.y, SAC) else outline(r.x, r.y, HILITE) end
     elseif mode == "block" and pending.attackerIndex == i then

@@ -349,4 +349,65 @@ function card.draw(sprite, element, x, y, scale, opts)
   love.graphics.setColor(1, 1, 1)
 end
 
+-- The card lies flat (rendered to a canvas, then warped to a receding trapezoid)
+-- with the hires art standing upright on it. Composition stays within the slot
+-- rect [x,y .. x+cw,y+ch] so existing hitboxes/outlines still line up.
+card.STAND_FAR   = 0.62   -- far-edge width as a fraction of the near (front) edge
+card.STAND_DEPTH = 0.5    -- flat-card height on screen (foreshortening)
+card.STAND_LIFT  = 0.5    -- feet plant along the flat depth (0 far..1 near)
+card.STAND_BOB   = 5      -- idle float amplitude in px
+
+local standCanvas, standMesh, standW, standH
+function card.drawStanding(sprite, hires, element, x, y, scale, opts)
+  opts = opts or {}
+  local cw, ch = card.size(sprite, scale)
+
+  if not standCanvas or standW ~= cw or standH ~= ch then
+    standCanvas = love.graphics.newCanvas(cw, ch)
+    standW, standH = cw, ch
+  end
+  local prev = love.graphics.getCanvas()
+  love.graphics.setCanvas({ standCanvas, stencil = true })
+  love.graphics.clear(0, 0, 0, 0)
+  card.draw(sprite, element, 0, 0, scale, opts)
+  love.graphics.setCanvas(prev)
+
+  local flatH = ch * card.STAND_DEPTH
+  local farW  = cw * card.STAND_FAR
+  local yNear = y + ch
+  local yFar  = yNear - flatH
+  local fx0, fx1 = x + (cw - farW) / 2, x + (cw + farW) / 2
+  standMesh = standMesh or love.graphics.newMesh(4, "fan", "stream")
+  standMesh:setVertices({
+    { fx0, yFar, 0, 0, 1, 1, 1, 1 },
+    { fx1, yFar, 1, 0, 1, 1, 1, 1 },
+    { x + cw, yNear, 1, 1, 1, 1, 1, 1 },
+    { x, yNear, 0, 1, 1, 1, 1, 1 },
+  })
+  standMesh:setTexture(standCanvas)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.draw(standMesh)
+
+  local footX = x + cw / 2
+  local footY = yFar + flatH * card.STAND_LIFT
+  local targetH = footY - (y + 2)
+  local iw, ih
+  if hires then iw, ih = hires:getDimensions() else iw, ih = sprite.w, sprite.h end
+  local s = math.min(targetH / ih, cw * 1.05 / iw)
+  local dw, dh = iw * s, ih * s
+
+  local time = opts.time or love.timer.getTime()
+  local lift = math.sin(time * 2 + x * 0.05) * card.STAND_BOB
+  local frac = lift / card.STAND_BOB * 0.5 + 0.5   -- 0 low .. 1 high
+  love.graphics.setColor(0, 0, 0, 0.33 * (1 - 0.3 * frac))
+  love.graphics.ellipse("fill", footX, footY, dw * 0.34 * (1 - 0.15 * frac), flatH * 0.16 * (1 - 0.15 * frac))
+  love.graphics.setColor(1, 1, 1)
+  local cy = footY - dh - lift
+  if hires then
+    love.graphics.draw(hires, footX - dw / 2, cy, 0, s, s)
+  else
+    drawSprite(sprite, footX - dw / 2, cy, s)
+  end
+end
+
 return card
